@@ -1,4 +1,4 @@
-package main
+package handler
 
 type NServer struct {
 	Id                     string   `json:"id"`
