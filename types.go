@@ -1,6 +1,7 @@
 package main
 
 type NServer struct {
+	Id                     string   `json:"id"`
 	Listen                 []string `json:"listen"`
 	ServerName             []string `json:"server_name"`
 	SslCertificate         string   `json:"ssl_certificate"`
@@ -19,6 +20,7 @@ type NServer struct {
 }
 
 type NLocation struct {
+	Id                 string     `json:"id"`
 	IsProxy            bool       `json:"is_proxy"`
 	IsFastCgi          bool       `json:"is_fast_cgi"`
 	Path               string     `json:"path"`
@@ -30,17 +32,19 @@ type NLocation struct {
 	ProxyPass          string     `json:"proxy_pass"`
 	ProxySetHeaders    [][]string `json:"proxy_set_headers"`
 	ProxyHttpVersion   string     `json:"proxy_http_version"`
-	ProxyCacheValids   [][]string `json:"proxy_cache_valids"`
+	ProxyCacheValid    [][]string `json:"proxy_cache_valid"`
 	ProxyCacheUseStale []string   `json:"proxy_cache_use_stale"`
-	Indexs             []string   `json:"indexs"`
+	Index              []string   `json:"index"`
 	TryFiles           []string   `json:"try_files"`
 	FastCgiPass        string     `json:"fast_cgi_pass"`
 	FastCgiIndex       string     `json:"fast_cgi_index"`
 	FastCgiParam       []string   `json:"fast_cgi_param"`
 	Includes           []string   `json:"includes"`
+	Deny               string     `json:"deny"`
 }
 
 type NHttp struct {
+	Id        string    `json:"id"`
 	LogFormat []string  `json:"log_format"`
 	AccessLog []string  `json:"access_log"`
 	Includes  []string  `json:"includes"`

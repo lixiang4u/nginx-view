@@ -2,11 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/cespare/xxhash/v2"
 	"github.com/tufanbarisyildirim/gonginx"
 	"github.com/tufanbarisyildirim/gonginx/parser"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 func ToJsonString(v interface{}, pretty bool) string {
@@ -19,31 +23,28 @@ func ToJsonString(v interface{}, pretty bool) string {
 	return string(buf)
 }
 
+func HashString(data string) string {
+	return fmt.Sprintf("%x", xxhash.Sum64String(data))
+}
+
 func main() {
 
 	if len(os.Args) <= 1 {
 		log.Println("[info] 需要指定nginx配置文件地址")
 		return
 	}
-	var f = os.Args[1]
+	var configFile = os.Args[1]
 
-	p, err := parser.NewParser(f)
+	directives, err := parseConfig(configFile)
 	if err != nil {
 		log.Println("[parser.NewParser.Error]", err.Error())
 		return
 	}
-	defer func() { _ = p.Close() }()
-	conf, err := p.Parse()
-	if err != nil {
-		log.Println("[p.Parse.Error]", err.Error())
-		return
-	}
+
 	var nHttp NHttp
 	var nServer NServer
 	var nLocation NLocation
-	for _, directive := range conf.GetDirectives() {
-		//log.Println("[pp]", directive.GetName(), directive.GetParameters())
-		//continue
+	for _, directive := range directives {
 		if directive.GetName() == "http" {
 			nHttp = parseHttp(directive.GetBlock().GetDirectives())
 			log.Println("[nHttp]", ToJsonString(nHttp, true))
@@ -62,6 +63,19 @@ func main() {
 	//log.Println("[nServer]", ToJsonString(nServer, true))
 	//log.Println("[nLocation]", ToJsonString(nLocation, true))
 
+}
+
+func parseConfig(configFile string) (directives []gonginx.IDirective, err error) {
+	p, err := parser.NewParser(configFile)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = p.Close() }()
+	conf, err := p.Parse()
+	if err != nil {
+		return nil, err
+	}
+	return conf.GetDirectives(), nil
 }
 
 func parseServer(directives []gonginx.IDirective) NServer {
@@ -110,6 +124,10 @@ func parseServer(directives []gonginx.IDirective) NServer {
 		}
 	}
 
+	if len(nServer.Listen) > 0 || len(nServer.ServerName) > 0 {
+		nServer.Id = HashString(fmt.Sprintf("%d", time.Now().UnixNano()))
+	}
+
 	return nServer
 }
 
@@ -125,12 +143,18 @@ func parseHttp(directives []gonginx.IDirective) NHttp {
 		case "access_log":
 			nHttp.AccessLog = d.GetParameters()
 		case "include":
-			nHttp.Includes = d.GetParameters()
+			//  按照上下文推断出应该是server模块等数据
+			var files = parseIncludeFiles(d.GetParameters()[0])
+			nHttp.Servers = append(nHttp.Servers, parseIncludeConfig(files)...)
+			nHttp.Includes = append(nHttp.Includes, d.GetParameters()...)
 		case "sendfile":
 			nHttp.Sendfile = d.GetParameters()
 		case "server":
 			nHttp.Servers = append(nHttp.Servers, parseServer(d.GetBlock().GetDirectives()))
 		}
+	}
+	if len(nHttp.Servers) > 0 {
+		nHttp.Id = HashString(fmt.Sprintf("%d", time.Now().UnixNano()))
 	}
 
 	return nHttp
@@ -141,7 +165,8 @@ func parseLocation(directives []gonginx.IDirective) NLocation {
 
 	nLocation.ProxySetHeaders = make([][]string, 0)
 	nLocation.ProxyCacheUseStale = make([]string, 0)
-	nLocation.Indexs = make([]string, 0)
+	nLocation.ProxyCacheValid = make([][]string, 0)
+	nLocation.Index = make([]string, 0)
 	nLocation.TryFiles = make([]string, 0)
 	nLocation.Includes = make([]string, 0)
 	nLocation.AddHeaders = make([][]string, 0)
@@ -150,7 +175,7 @@ func parseLocation(directives []gonginx.IDirective) NLocation {
 	for _, d := range directives {
 		switch d.GetName() {
 		case "index":
-			nLocation.Indexs = append(nLocation.Indexs, d.GetParameters()...)
+			nLocation.Index = append(nLocation.Index, d.GetParameters()...)
 		case "try_files":
 			nLocation.TryFiles = append(nLocation.TryFiles, strings.Join(d.GetParameters(), " "))
 		case "root":
@@ -171,7 +196,7 @@ func parseLocation(directives []gonginx.IDirective) NLocation {
 			nLocation.IsProxy = true
 			nLocation.ProxyPass = d.GetParameters()[0]
 		case "proxy_cache_valid":
-			nLocation.ProxyCacheValids = append(nLocation.ProxyCacheValids, d.GetParameters())
+			nLocation.ProxyCacheValid = append(nLocation.ProxyCacheValid, d.GetParameters())
 		case "proxy_cache_use_stale":
 			nLocation.ProxyCacheUseStale = append(nLocation.ProxyCacheUseStale, d.GetParameters()...)
 		case "fastcgi_pass":
@@ -183,8 +208,40 @@ func parseLocation(directives []gonginx.IDirective) NLocation {
 			nLocation.FastCgiParam = append(nLocation.FastCgiParam, strings.Join(d.GetParameters(), " "))
 		case "include":
 			nLocation.Includes = append(nLocation.Includes, d.GetParameters()...)
+		case "deny":
+			nLocation.Deny = d.GetParameters()[0]
 		}
 	}
+	nLocation.Id = HashString(fmt.Sprintf("%d", time.Now().UnixNano()))
 
 	return nLocation
+}
+
+func parseIncludeConfig(configFiles []string) []NServer {
+	var nServers []NServer
+	for _, tmpFile := range configFiles {
+		log.Println("[include]", tmpFile)
+		parsedDirectives, err := parseConfig(tmpFile)
+		if err != nil {
+			continue
+		}
+		for _, directive := range parsedDirectives {
+			if directive.GetName() == "server" {
+				log.Println("[parse server]")
+				tmpServer := parseServer(directive.GetBlock().GetDirectives())
+				if len(tmpServer.Id) > 0 {
+					nServers = append(nServers, tmpServer)
+				}
+			}
+		}
+	}
+	return nServers
+}
+
+func parseIncludeFiles(pattern string) []string {
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return make([]string, 0)
+	}
+	return matches
 }
