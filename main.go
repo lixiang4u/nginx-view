@@ -58,7 +58,7 @@ func main() {
 			log.Println("[nLocation]", ToJsonString(nLocation, true))
 		}
 	}
-	log.Println("[file]", f)
+	log.Println("[file]", configFile)
 	//log.Println("[nHttp]", ToJsonString(nHttp, true))
 	//log.Println("[nServer]", ToJsonString(nServer, true))
 	//log.Println("[nLocation]", ToJsonString(nLocation, true))
