@@ -3,20 +3,25 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"path/filepath"
+	"time"
 )
 
 func NginxConfigViewer(ctx *gin.Context) {
+	ctx.File(filepath.Join(AppRoot(), "tpl/nginx_config_viewer_tpl.html"))
+}
+func NginxConfigJson(ctx *gin.Context) {
 	nHttp, err := parse(NginxConfig)
 	if err != nil {
-		ctx.HTML(http.StatusOK, "error.html", gin.H{
-			"config_config_file": NginxConfig,
-			"msg":                err.Error(),
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
 		})
+		return
 	}
 
-	ctx.HTML(http.StatusOK, "nginx_config_viewer_tpl.html", gin.H{
-		"config_file":      NginxConfig,
-		"http_data":        nHttp,
-		"http_json_string": ToJsonString(nHttp, true),
+	ctx.JSON(http.StatusOK, gin.H{
+		"time":        time.Now().Unix(),
+		"config_file": NginxConfig,
+		"config_data": nHttp,
 	})
 }

@@ -16,8 +16,8 @@ func main() {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGKILL)
 
 	r := gin.Default()
-	r.LoadHTMLGlob("tpl/*.html")
-	r.GET("/", handler.NginxConfigViewer)
+	//r.Static("/", handler.AppRoot())
+	r.GET("/config", handler.NginxConfigJson)
 	r.NoRoute(handler.NginxConfigViewer)
 	port := handler.CheckNextUsefulPort(handler.ParseArgPort())
 	go func() { _ = r.Run(fmt.Sprintf(":%d", port)) }()
