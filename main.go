@@ -45,23 +45,26 @@ func main() {
 	var nServer NServer
 	var nLocation NLocation
 	for _, directive := range directives {
-		if directive.GetName() == "http" {
-			nHttp = parseHttp(directive.GetBlock().GetDirectives())
-			log.Println("[nHttp]", ToJsonString(nHttp, true))
-		}
-		if directive.GetName() == "server" {
+		switch directive.GetName() {
+		case "http":
+			nHttp = parseHttp(filepath.Dir(configFile), directive.GetBlock().GetDirectives())
+		case "server":
 			nServer = parseServer(directive.GetBlock().GetDirectives())
-			log.Println("[nServer]", ToJsonString(nServer, true))
-		}
-		if directive.GetName() == "location" {
+		case "location":
 			nLocation = parseLocation(directive.GetBlock().GetDirectives())
-			log.Println("[nLocation]", ToJsonString(nLocation, true))
 		}
 	}
-	log.Println("[file]", configFile)
-	//log.Println("[nHttp]", ToJsonString(nHttp, true))
-	//log.Println("[nServer]", ToJsonString(nServer, true))
-	//log.Println("[nLocation]", ToJsonString(nLocation, true))
+
+	if len(nHttp.Id) > 0 {
+		log.Println("[foundHttp]", ToJsonString(nHttp, true))
+	}
+	if len(nServer.Id) > 0 {
+		log.Println("[foundServer]", ToJsonString(nServer, true))
+	}
+	if len(nLocation.Id) > 0 {
+		log.Println("[foundLocation]", ToJsonString(nLocation, true))
+	}
+	log.Println("[configFile]", configFile)
 
 }
 
@@ -131,7 +134,7 @@ func parseServer(directives []gonginx.IDirective) NServer {
 	return nServer
 }
 
-func parseHttp(directives []gonginx.IDirective) NHttp {
+func parseHttp(configRoot string, directives []gonginx.IDirective) NHttp {
 	var nHttp NHttp
 
 	nHttp.Servers = make([]NServer, 0)
@@ -144,7 +147,7 @@ func parseHttp(directives []gonginx.IDirective) NHttp {
 			nHttp.AccessLog = d.GetParameters()
 		case "include":
 			//  按照上下文推断出应该是server模块等数据
-			var files = parseIncludeFiles(d.GetParameters()[0])
+			var files = parseIncludeFiles(configRoot, d.GetParameters()[0])
 			nHttp.Servers = append(nHttp.Servers, parseIncludeConfig(files)...)
 			nHttp.Includes = append(nHttp.Includes, d.GetParameters()...)
 		case "sendfile":
@@ -220,14 +223,12 @@ func parseLocation(directives []gonginx.IDirective) NLocation {
 func parseIncludeConfig(configFiles []string) []NServer {
 	var nServers []NServer
 	for _, tmpFile := range configFiles {
-		log.Println("[include]", tmpFile)
 		parsedDirectives, err := parseConfig(tmpFile)
 		if err != nil {
 			continue
 		}
 		for _, directive := range parsedDirectives {
 			if directive.GetName() == "server" {
-				log.Println("[parse server]")
 				tmpServer := parseServer(directive.GetBlock().GetDirectives())
 				if len(tmpServer.Id) > 0 {
 					nServers = append(nServers, tmpServer)
@@ -238,7 +239,13 @@ func parseIncludeConfig(configFiles []string) []NServer {
 	return nServers
 }
 
-func parseIncludeFiles(pattern string) []string {
+func parseIncludeFiles(configRoot string, pattern string) []string {
+	pattern = strings.TrimSpace(pattern)
+	pattern = strings.Trim(pattern, "\"")
+	pattern = strings.Trim(pattern, "'")
+	if !filepath.IsAbs(pattern) {
+		pattern = filepath.Join(configRoot, pattern)
+	}
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return make([]string, 0)
