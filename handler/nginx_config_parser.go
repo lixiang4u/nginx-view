@@ -8,7 +8,6 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func parse(configFile string) (NHttp, error) {
@@ -114,7 +113,13 @@ func parseServer(directives []gonginx.IDirective) NServer {
 	}
 
 	if len(nServer.Listen) > 0 || len(nServer.ServerName) > 0 {
-		nServer.Id = HashString(fmt.Sprintf("%d", time.Now().UnixNano()))
+		nServer.Id = HashString(fmt.Sprintf(
+			"Server,%d,%s,%s,%s",
+			len(nServer.Locations),
+			strings.Join(nServer.Listen, ""),
+			nServer.ServerName,
+			nServer.Root,
+		))
 	}
 
 	return nServer
@@ -143,7 +148,11 @@ func parseHttp(configRoot string, directives []gonginx.IDirective) NHttp {
 		}
 	}
 	if len(nHttp.Servers) > 0 {
-		nHttp.Id = HashString(fmt.Sprintf("%d", time.Now().UnixNano()))
+		nHttp.Id = HashString(fmt.Sprintf(
+			"Http,%d,%s",
+			len(nHttp.Servers),
+			nHttp.Includes,
+		))
 	}
 
 	return nHttp
@@ -201,7 +210,14 @@ func parseLocation(directives []gonginx.IDirective) NLocation {
 			nLocation.Deny = d.GetParameters()[0]
 		}
 	}
-	nLocation.Id = HashString(fmt.Sprintf("%d", time.Now().UnixNano()))
+	nLocation.Id = HashString(fmt.Sprintf(
+		"Location,%s,%s,%s,%s,%s",
+		nLocation.Root,
+		nLocation.Path,
+		nLocation.Alias,
+		strings.Join(nLocation.Index, ""),
+		strings.Join(nLocation.TryFiles, ""),
+	))
 
 	return nLocation
 }

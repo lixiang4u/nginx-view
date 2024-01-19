@@ -15,8 +15,8 @@ func NginxConfigViewer(ctx *gin.Context) {
 	}
 
 	ctx.HTML(http.StatusOK, "nginx_config_viewer_tpl.html", gin.H{
-		"config_config_file": NginxConfig,
-		"title":              "Main website",
-		"nHttp":              ToJsonString(nHttp, true),
+		"config_file":      NginxConfig,
+		"http_data":        nHttp,
+		"http_json_string": ToJsonString(nHttp, true),
 	})
 }
