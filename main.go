@@ -16,7 +16,6 @@ func main() {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGKILL)
 
 	r := gin.Default()
-	//r.Static("/", handler.AppRoot())
 	r.GET("/config", handler.NginxConfigJson)
 	r.NoRoute(handler.NginxConfigViewer)
 	port := handler.CheckNextUsefulPort(handler.ParseArgPort())

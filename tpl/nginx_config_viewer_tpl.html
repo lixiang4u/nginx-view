@@ -170,14 +170,14 @@
         if (location['try_files']) {
             location['try_files'].filter(item => {
                 if (item) {
-                    o.try_files.push(item)
+                    o.try_files.push(`try_files ${item}`)
                 }
             })
         }
         if (location['rewrites']) {
             location['rewrites'].filter(item => {
                 if (item) {
-                    o.try_files.push(item)
+                    o.try_files.push(`rewrite ${item}`)
                 }
             })
         }
