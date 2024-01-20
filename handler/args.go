@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-const defaultPort = 8000
+const defaultPort = 56666
 
 var NginxConfig string
 

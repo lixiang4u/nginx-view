@@ -6,56 +6,79 @@
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>NginxConfigViewer</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/axios@1.6.5/dist/axios.min.js"></script>
+    <!--
+    https://www.staticfile.org/
+    https://cdn.bytedance.com/
+    https://cdnjs.com/
+
+    https://www.jsdelivr.com/
+    https://unpkg.com/
+
+    https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.15/vue.cjs.js
+    -->
+    <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/vue/3.2.31/vue.global.min.js"></script>
+    <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/axios/0.26.0/axios.min.js"></script>
 </head>
 <body>
 
 <div id="app">
 
-    <div class="main">
+    <div class="main plr20">
         <div class="mb20">
-            <b>Nginx配置文件：{{ configFile }}</b>
+            <h1 style="text-align: center;">NginxConfigViewer</h1>
         </div>
-        <div class="card server" v-for="(server,index) in httpServers" :key="server.id">
-            <div class="server-title plr20">
-                <b>域名{{ index + 1 }}：{{ server['server_name'][0] }}</b>
-                <span class="tag" v-for="l in server['listen']">{{ l }}</span>
+        <div v-if="errorContent && errorContent.error">
+            <div class="datetime">
+                <div>错误信息：{{ errorContent['error'] }}</div>
+                <div>配置文件：{{ errorContent['config_file'] }}</div>
+                <div>解析时间：{{ errorContent['time'] }}</div>
             </div>
-            <div class="server-meta plr20">
-                <div class="plr20">
-                    <div>项目目录：{{ server['root'] }}</div>
-                    <div>证书历经：{{ server['ssl_certificate'] }}</div>
-                    <div>日志文件：{{ server['access_log'] }}</div>
+        </div>
+        <div v-else>
+            <div class="card server show-title-only" v-for="(server,index) in httpServers" :key="server.id">
+                <div class="server-title plr20" @click="onToggle($event)">
+                    <b>域名{{ index + 1 }}：{{ server['server_name'][0] ?? '/' }}</b>
+                    <span class="tag" v-for="l in server['listen']">{{ l }}</span>
                 </div>
-            </div>
-            <div class="server-locations plr20 mb20">
-                <div class="plr20">
-                    <b>路径Location</b>
+                <div class="server-meta plr20">
                     <div class="plr20">
-                        <table style="width: 100%">
-                            <thead>
-                            <tr>
-                                <td>路径</td>
-                                <td>目录</td>
-                                <td>重写请求</td>
-                                <td>TryFiles规则</td>
-                            </tr>
-                            </thead>
-                            <tr v-for="location in server['locations']" :key="location.id">
-                                <td>{{ showLocation(location)['path'] }}</td>
-                                <td>{{ showLocation(location)['root'] }}</td>
-                                <td>{{ showLocation(location)['rewrite'] }}</td>
-                                <td>{{ showLocation(location)['try_files'] }}</td>
-                            </tr>
+                        <div>项目目录：{{ server['root'] }}</div>
+                        <div>证书历经：{{ server['ssl_certificate'] }}</div>
+                        <div>日志文件：{{ server['access_log'] }}</div>
+                    </div>
+                </div>
+                <div class="server-locations plr20 mb20">
+                    <div class="plr20">
+                        <b>路径Location</b>
+                        <div class="plr20">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <td>路径</td>
+                                    <td>目录</td>
+                                    <td>重写/代理</td>
+                                    <td>重写/代理规则</td>
+                                </tr>
+                                </thead>
+                                <tr v-for="location in server['locations']" :key="location.id">
+                                    <td>{{ showLocation(location)['path'] }}</td>
+                                    <td>{{ showLocation(location)['root'] }}</td>
+                                    <td>{{ showLocation(location)['rewrite'] }}</td>
+                                    <td>
+                                        <div v-for="item in showLocation(location)['try_files']">{{ item }}</div>
+                                    </td>
+                                </tr>
 
-                        </table>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
+            <div class="datetime">
+                <div>配置文件：{{ configFile }}</div>
+                <div>解析时间：{{ datetime }}</div>
+            </div>
         </div>
-
-        <div class="datetime">配置解析时间：{{ datetime }}</div>
     </div>
 
 </div>
@@ -67,16 +90,26 @@
     const configData = ref(null)
     const httpServers = ref(null)
     const datetime = ref(null)
+    const errorContent = ref(null)
 
     const loadConfig = () => {
         axios.get('/config').then(function (response) {
-            console.log('[response]', response.data);
-            configFile.value = response.data['config_file'] ?? null
-            configData.value = response.data['config_data'] ?? null
-            datetime.value = formatUnixTime(response.data['time'] ?? 0)
-            httpServers.value = response.data['config_data']['servers'] ?? null
-        }).catch(function (error) {
-            console.error('[axios.error]', error);
+            if (!response.data['error']) {
+                configFile.value = response.data['config_file'] ?? null
+                configData.value = response.data['config_data'] ?? null
+                datetime.value = formatUnixTime(response.data['time'] ?? 0)
+                httpServers.value = response.data['config_data']['servers'] ?? null
+
+                errorContent.value = null
+            } else {
+                errorContent.value = response.data
+                errorContent.value.time = formatUnixTime(response.data['time'] ?? 0)
+
+            }
+        }).catch(error => {
+            console.log('[axios.error]', error);
+            errorContent.value.error = error
+
         });
     }
 
@@ -100,12 +133,24 @@
         loadConfig()
     }
 
+    const onToggle = (event) => {
+        const className = 'show-title-only'
+        const parent = event.target.parentNode;
+        let classList = parent.getAttribute('class').split(' ')
+        if (classList.includes(className)) {
+            classList = classList.filter(item => item !== className);
+        } else {
+            classList = classList.concat(className);
+        }
+        parent.setAttribute('class', classList.join(' '))
+    }
+
     const showLocation = (location) => {
         let o = {
             path: '',//请求路径
             root: '',//本地文件系统根目录（root/alias）
             rewrite: '',//重写/代理（try_files/proxy_pass/fast_cgi_pass）
-            try_files: '',//
+            try_files: [],//
         }
 
         o.path = location['path']
@@ -121,7 +166,21 @@
         if (location['is_fast_cgi']) {
             o.rewrite = location['fast_cgi_pass']
         }
-        o.try_files = location['try_files'][0] ?? ''
+
+        if (location['try_files']) {
+            location['try_files'].filter(item => {
+                if (item) {
+                    o.try_files.push(item)
+                }
+            })
+        }
+        if (location['rewrites']) {
+            location['rewrites'].filter(item => {
+                if (item) {
+                    o.try_files.push(item)
+                }
+            })
+        }
 
 
         return o
@@ -135,7 +194,9 @@
                 configFile,
                 configData,
                 datetime,
+                onToggle,
                 showLocation,
+                errorContent,
             }
         }
     }).mount('#app')
@@ -187,6 +248,7 @@
     }
 
     .main {
+        min-width: 960px;
         //max-width: 1200px;
         margin: 20px auto 20px auto;
     }
@@ -200,6 +262,13 @@
         }
     }
 
+    .show-title-only {
+        .server-meta,
+        .server-locations {
+            display: none;
+        }
+    }
+
     .server-title {
         line-height: 60px;
         background-color: #f6f6f6;
@@ -207,12 +276,17 @@
 
     .server-locations {
         table {
+            width: 100%;
             border-spacing: 0;
             border-collapse: collapse;
 
             tr {
                 line-height: 50px;
                 border-bottom: 1px solid #e6e6e6;
+
+                td {
+                    padding: 0 20px 0 20px;
+                }
             }
 
             tr:hover {
@@ -223,6 +297,7 @@
     }
 
     .datetime {
+        line-height: 28px;
         padding: 0 5px 0 5px;
         font-size: 14px;
         color: #9e9e9e;

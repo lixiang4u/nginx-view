@@ -227,6 +227,7 @@ func parseIncludeConfig(configFiles []string) []NServer {
 	for _, tmpFile := range configFiles {
 		parsedDirectives, err := parseConfig(tmpFile)
 		if err != nil {
+			log.Println("[parse_include_error]", tmpFile)
 			continue
 		}
 		for _, directive := range parsedDirectives {

@@ -13,8 +13,10 @@ func NginxConfigViewer(ctx *gin.Context) {
 func NginxConfigJson(ctx *gin.Context) {
 	nHttp, err := parse(NginxConfig)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
+		ctx.JSON(http.StatusOK, gin.H{
+			"time":        time.Now().Unix(),
+			"config_file": NginxConfig,
+			"error":       err.Error(),
 		})
 		return
 	}
